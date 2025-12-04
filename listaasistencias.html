@@ -1,0 +1,327 @@
+<!doctype html>
+
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Asistencias Web - Colegio Santa María</title>
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* Colores exigidos */
+    .status-presente { background-color: #0be03c !important; }
+    .status-tardanza { background-color: #f8c006 !important; }
+    .status-ausente { background-color: #eb0c1e !important; }
+    .pointer { cursor: pointer; }
+    body { padding-top: 70px; }
+    .student-row { transition: background-color .2s; }
+  </style>
+</head>
+<body><nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">Asistencias - Colegio Santa María</a>
+    <div class="d-flex">
+      <button id="btn-logout" class="btn btn-outline-light d-none">Cerrar sesión</button>
+    </div>
+  </div>
+</nav><div class="container">
+  <!-- Login -->
+  <div id="login-card" class="card mx-auto" style="max-width:600px">
+    <div class="card-body">
+      <h5 class="card-title">Iniciar sesión</h5>
+      <form id="login-form">
+        <div class="mb-3">
+          <label for="username" class="form-label">Usuario</label>
+          <input type="text" class="form-control" id="username" required>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Contraseña</label>
+          <input type="password" class="form-control" id="password" required>
+        </div>
+        <div class="mb-3 text-muted">Credenciales de ejemplo: <strong>preceptor / preceptor</strong> o <strong>admin / admin</strong></div>
+        <button class="btn btn-primary">Entrar</button>
+      </form>
+    </div>
+  </div>  <!-- Preceptor view -->  <div id="preceptor-view" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3>Tomar asistencia</h3>
+      <div>
+        <label class="form-label me-2">Fecha:</label>
+        <input id="date-input" type="date" class="form-control d-inline-block" style="width:200px">
+      </div>
+    </div><div class="mb-3">
+  <button id="open-mark-modal" class="btn btn-success me-2">Marcar seleccionados</button>
+  <button id="mark-all-present" class="btn btn-outline-success me-2">Marcar todos presentes</button>
+  <button id="clear-attendance" class="btn btn-outline-secondary">Borrar registros de la fecha</button>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">Listado de alumnos</h5>
+    <div class="table-responsive">
+      <table class="table table-hover" id="students-table">
+        <thead>
+          <tr>
+            <th><input id="select-all" type="checkbox"></th>
+            <th>ID</th>
+            <th>Apellido y Nombre</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="students-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+  </div>  <!-- Admin view -->  <div id="admin-view" class="d-none">
+    <h3>Informes - Administrador</h3>
+    <div class="row mb-3">
+      <div class="col-auto">
+        <label class="form-label">Seleccionar fecha</label>
+        <input id="admin-date" type="date" class="form-control">
+      </div>
+      <div class="col-auto align-self-end">
+        <button id="load-report" class="btn btn-primary">Cargar informe</button>
+      </div>
+      <div class="col-auto align-self-end">
+        <button id="list-dates" class="btn btn-outline-secondary">Fechas con registros</button>
+      </div>
+    </div><div id="report-card" class="card d-none">
+  <div class="card-body">
+    <h5 id="report-title" class="card-title"></h5>
+    <div class="table-responsive">
+      <table class="table" id="report-table">
+        <thead>
+          <tr><th>ID</th><th>Alumno</th><th>Estado</th></tr>
+        </thead>
+        <tbody id="report-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+  </div></div><!-- Modal para elegir estado a los seleccionados --><div class="modal fade" id="markModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Marcar asistencia</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="selected-count">0 alumnos seleccionados</p>
+        <div class="mb-3">
+          <label class="form-label">Estado a aplicar</label>
+          <select id="status-select" class="form-select">
+            <option value="present">Presente</option>
+            <option value="tardy">Tardanza</option>
+            <option value="absent">Ausente</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="save-mark" class="btn btn-primary">Guardar</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div><!-- Bootstrap JS --><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script><script>
+// Datos de ejemplo: lista de alumnos (id numérico + nombre)
+const STUDENTS = [
+  {id: 1, name: 'González, María'},
+  {id: 2, name: 'López, Juan'},
+  {id: 3, name: 'Pérez, Ana'},
+  {id: 4, name: 'Martínez, Luis'},
+  {id: 5, name: 'Romero, Sofía'},
+  {id: 6, name: 'García, Pedro'},
+  {id: 7, name: 'Fernández, Carla'},
+  {id: 8, name: 'Sosa, Martín'}
+];
+
+const ROLE_KEYS = { preceptor: 'preceptor', admin: 'admin' };
+let currentRole = null;
+
+// Utilidades localStorage
+function storageKeyForDate(dateStr){
+  return `asistencias_${dateStr}`;
+}
+function saveAttendanceForDate(dateStr, attendanceArray){
+  localStorage.setItem(storageKeyForDate(dateStr), JSON.stringify(attendanceArray));
+}
+function loadAttendanceForDate(dateStr){
+  const raw = localStorage.getItem(storageKeyForDate(dateStr));
+  return raw ? JSON.parse(raw) : null;
+}
+function deleteAttendanceForDate(dateStr){
+  localStorage.removeItem(storageKeyForDate(dateStr));
+}
+
+// Helper: get today's date in yyyy-mm-dd
+function todayISO(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+// Rendering estudiantes
+function renderStudentsTable(dateStr){
+  const tbody = document.getElementById('students-tbody');
+  tbody.innerHTML = '';
+  const attendance = loadAttendanceForDate(dateStr) || [];
+  const map = new Map(attendance.map(a => [a.id, a.status]));
+  STUDENTS.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.classList.add('student-row');
+    const status = map.get(s.id) || 'none';
+    if(status === 'present') tr.classList.add('status-presente');
+    if(status === 'tardy') tr.classList.add('status-tardanza');
+    if(status === 'absent') tr.classList.add('status-ausente');
+
+    tr.innerHTML = `
+      <td><input type="checkbox" class="sel-check" data-id="${s.id}"></td>
+      <td>${s.id}</td>
+      <td>${s.name}</td>
+      <td class="fw-bold text-capitalize">${status === 'none' ? 'Sin marcar' : (status === 'present'? 'Presente' : status === 'tardy' ? 'Tardanza' : 'Ausente')}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Login handling
+const loginForm = document.getElementById('login-form');
+loginForm.addEventListener('submit', e =>{
+  e.preventDefault();
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value.trim();
+  if((u === 'preceptor' && p === 'preceptor') || (u=== 'admin' && p==='admin')){
+    currentRole = u === 'admin' ? 'admin' : 'preceptor';
+    afterLogin();
+  } else {
+    alert('Credenciales incorrectas');
+  }
+});
+
+function afterLogin(){
+  document.getElementById('login-card').classList.add('d-none');
+  document.getElementById('btn-logout').classList.remove('d-none');
+  document.getElementById('btn-logout').addEventListener('click', ()=> location.reload());
+  if(currentRole === 'preceptor'){
+    document.getElementById('preceptor-view').classList.remove('d-none');
+    const dateInput = document.getElementById('date-input');
+    dateInput.value = todayISO();
+    dateInput.addEventListener('change', ()=> renderStudentsTable(dateInput.value));
+    renderStudentsTable(dateInput.value);
+  } else if(currentRole === 'admin'){
+    document.getElementById('admin-view').classList.remove('d-none');
+    const adminDate = document.getElementById('admin-date');
+    adminDate.value = todayISO();
+  }
+}
+
+// Modal logic
+const markModal = new bootstrap.Modal(document.getElementById('markModal'));
+const openMarkBtn = document.getElementById('open-mark-modal');
+openMarkBtn.addEventListener('click', ()=>{
+  const selected = getSelectedIds();
+  if(selected.length === 0){ alert('Seleccione al menos un alumno.'); return; }
+  document.getElementById('selected-count').textContent = `${selected.length} alumnos seleccionados`;
+  markModal.show();
+});
+
+function getSelectedIds(){
+  const checks = Array.from(document.querySelectorAll('.sel-check'));
+  return checks.filter(c => c.checked).map(c => Number(c.dataset.id));
+}
+
+// save mark
+document.getElementById('save-mark').addEventListener('click', ()=>{
+  const status = document.getElementById('status-select').value; // present, tardy, absent
+  const date = document.getElementById('date-input').value;
+  if(!date){ alert('Seleccione una fecha'); return; }
+  const selected = getSelectedIds();
+  if(selected.length === 0){ alert('No hay alumnos seleccionados'); return; }
+  // load existing
+  let attendance = loadAttendanceForDate(date) || [];
+  // convert to map for easy update
+  const map = new Map(attendance.map(a => [a.id, a.status]));
+  selected.forEach(id => map.set(id, status));
+  // convert back
+  attendance = Array.from(map.entries()).map(([id, status]) => ({id, status}));
+  // ensure any newly selected but previously unmarked students also included
+  saveAttendanceForDate(date, attendance);
+  renderStudentsTable(date);
+  markModal.hide();
+});
+
+// select all checkbox
+document.getElementById('select-all').addEventListener('change', function(){
+  const checked = this.checked;
+  document.querySelectorAll('.sel-check').forEach(c => c.checked = checked);
+});
+
+// mark all present
+document.getElementById('mark-all-present').addEventListener('click', ()=>{
+  const date = document.getElementById('date-input').value;
+  if(!date) { alert('Seleccione una fecha'); return; }
+  const attendance = STUDENTS.map(s => ({id: s.id, status: 'present'}));
+  saveAttendanceForDate(date, attendance);
+  renderStudentsTable(date);
+});
+
+// clear attendance for date
+document.getElementById('clear-attendance').addEventListener('click', ()=>{
+  const date = document.getElementById('date-input').value;
+  if(!date) return alert('Seleccione una fecha');
+  if(confirm('Eliminar registros de la fecha ' + date + '?')){
+    deleteAttendanceForDate(date);
+    renderStudentsTable(date);
+  }
+});
+
+// Admin: load report for selected date
+document.getElementById('load-report').addEventListener('click', ()=>{
+  const date = document.getElementById('admin-date').value;
+  loadAdminReport(date);
+});
+
+function loadAdminReport(date){
+  const data = loadAttendanceForDate(date);
+  const card = document.getElementById('report-card');
+  const tbody = document.getElementById('report-tbody');
+  const title = document.getElementById('report-title');
+  if(!data){
+    card.classList.remove('d-none');
+    tbody.innerHTML = '<tr><td colspan="3">No hay registros para esta fecha</td></tr>';
+    title.textContent = `Informe - ${date}`;
+    return;
+  }
+  const map = new Map(data.map(d=> [d.id, d.status]));
+  tbody.innerHTML = '';
+  STUDENTS.forEach(s =>{
+    const status = map.get(s.id) || 'Sin marcar';
+    const tr = document.createElement('tr');
+    if(status === 'present') tr.classList.add('status-presente');
+    if(status === 'tardy') tr.classList.add('status-tardanza');
+    if(status === 'absent') tr.classList.add('status-ausente');
+    tr.innerHTML = `<td>${s.id}</td><td>${s.name}</td><td class="fw-bold">${status === 'present' ? 'Presente' : status === 'tardy' ? 'Tardanza' : status === 'absent' ? 'Ausente' : 'Sin marcar'}</td>`;
+    tbody.appendChild(tr);
+  });
+  title.textContent = `Informe - ${date}`;
+  card.classList.remove('d-none');
+}
+
+// List dates that have stored attendance
+document.getElementById('list-dates').addEventListener('click', ()=>{
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('asistencias_'));
+  if(keys.length === 0) return alert('No hay registros guardados');
+  const dates = keys.map(k => k.replace('asistencias_',''));
+  alert('Fechas con registros:\n' + dates.join('\n'));
+});
+
+// Admin date quick load when logging in
+// Save demo: if no attendance present for today, create empty structure (optional)
+
+</script></body>
+</html>
